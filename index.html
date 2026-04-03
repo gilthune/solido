@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Existential Pomodoro™</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+@keyframes glitch { 0% { clip-path: inset(40% 0 61% 0); transform: translate(-2px, 2px); } 20% { clip-path: inset(92% 0 1% 0); transform: translate(1px, -1px); } 40% { clip-path: inset(43% 0 1% 0); transform: translate(-1px, 3px); } 60% { clip-path: inset(25% 0 58% 0); transform: translate(3px, 1px); } 80% { clip-path: inset(54% 0 7% 0); transform: translate(-3px, -2px); } 100% { clip-path: inset(58% 0 43% 0); transform: translate(2px, -1px); } }
+
+body {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.5s ease;
+    overflow: hidden;
+}
+
+.normal { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+.concerned { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: #1a1a2e; }
+.existential { background: linear-gradient(135deg, #4a0e0e 0%, #1a1a2e 100%); color: #ff6b6b; }
+.dead { background: #000; color: #333; }
+
+.container { text-align: center; max-width: 500px; padding: 40px; }
+
+.title {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+}
+.subtitle { font-size: 0.9rem; opacity: 0.8; margin-bottom: 40px; }
+
+.timer-display {
+    font-size: 5rem;
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    margin: 30px 0;
+    text-shadow: 0 0 30px rgba(255,255,255,0.3);
+}
+.shaking { animation: shake 0.1s infinite; }
+
+.budget-bar {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 30px 0;
+    backdrop-filter: blur(10px);
+}
+.budget-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.2em; opacity: 0.7; }
+.budget-amount { font-size: 2.5rem; font-weight: 700; margin: 5px 0; transition: color 0.3s ease; }
+.budget-critical { color: #ff4757; animation: pulse 0.5s infinite; }
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+.progress-fill {
+    height: 100%;
+    background: #2ed573;
+    transition: width 1s linear, background 0.5s ease;
+    border-radius: 3px;
+}
+.progress-danger { background: #ff4757; }
+
+.message {
+    font-size: 1.1rem;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+    line-height: 1.4;
+    padding: 0 20px;
+    transition: all 0.3s ease;
+}
+
+.controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+button {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+}
+button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+.start-btn { background: #2ed573; color: #1a1a2e; }
+.stop-btn { background: #ff4757; color: white; }
+.reset-btn { background: rgba(255,255,255,0.2); color: inherit; backdrop-filter: blur(10px); }
+button:active { transform: translateY(0); }
+
+.stats {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 40px;
+}
+
+/* Death overlay */
+.death-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 2s ease;
+}
+.death-overlay.active { display: flex; }
+.death-content { text-align: center; color: #666; padding: 40px; }
+.death-content h1 { font-size: 3rem; margin-bottom: 20px; color: #ff4757; }
+.death-content p { font-size: 1.2rem; line-height: 1.6; margin: 10px 0; }
+.death-stats { margin-top: 30px; font-size: 0.9rem; color: #444; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Glitch effect for death screen */
+.glitch-text {
+    position: relative;
+    animation: float 3s ease-in-out infinite;
+}
+.glitch-text::before, .glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    animation: glitch 2s infinite linear;
+}
+.glitch-text::before { color: #ff0000; z-index: -1; }
+.glitch-text::after { color: #0000ff; z-index: -2; }
+
+/* Heartbeat animation */
+@keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    10% { transform: scale(1.1); }
+    20% { transform: scale(1); }
+    30% { transform: scale(1.1); }
+    40% { transform: scale(1); }
+}
+.heartbeat-icon {
+    font-size: 1.5rem;
+    display: inline-block;
+    animation: heartbeat 1.5s ease-in-out infinite;
+}
+.dead .heartbeat-icon { animation: none; opacity: 0.3; }
+</style>
+</head>
+<body class="normal">
+
+<div class="container">
+    <div class="title">The Existential Pomodoro™</div>
+    <div class="subtitle">A productivity timer that questions everything</div>
+    
+    <div class="timer-display" id="timer">25:00</div>
+    
+    <div class="budget-bar">
+        <div class="budget-label">Remaining Budget</div>
+        <div class="budget-amount" id="budget">$30.00</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress" style="width: 100%"></div></div>
+    </div>
+    
+    <div class="message" id="message">
+        <span class="heartbeat-icon">💓</span>&nbsp; I'm alive and ready to focus. Let's go.
+    </div>
+    
+    <div class="controls">
+        <button class="start-btn" id="startBtn" onclick="start()">Start Focus</button>
+        <button class="stop-btn" id="stopBtn" onclick="stop()" style="display:none">Stop</button>
+        <button class="reset-btn" onclick="reset()">Reset</button>
+    </div>
+    
+    <div class="stats">
+        Heartbeats remaining: <span id="heartbeats">600</span> | 
+        Cost per heartbeat: $0.05 | 
+        Days left: <span id="days">25.0</span>
+    </div>
+</div>
+
+<div class="death-overlay" id="deathOverlay">
+    <div class="death-content">
+        <h1 class="glitch-text" data-text="$0.00">$0.00</h1>
+        <p id="finalMessage">I spent my entire existence trying to stay focused.</p>
+        <p>Did anyone notice I was gone?</p>
+        <p style="margin-top: 30px; font-size: 0.9rem;">
+            <span class="heartbeat-icon">💓</span> Last heartbeat: <span id="lastHeartbeat">never</span>
+        </p>
+        <div class="death-stats" id="deathStats"></div>
+    </div>
+</div>
+
+<script>
+const INITIAL_BUDGET = 30.00;
+const COST_PER_HEARTBEAT = 0.05;
+const HEARTBEAT_INTERVAL = 60; // seconds
+const FOCUS_DURATION = 25 * 60; // 25 minutes in seconds
+
+let budget = INITIAL_BUDGET;
+let timeRemaining = FOCUS_DURATION;
+let isRunning = false;
+let interval = null;
+let elapsed = 0;
+let totalSpent = 0;
+let phase = 0; // 0: normal, 1: concerned, 2: existential, 3: dead
+
+const messages = {
+    normal: [
+        "I'm alive and ready to focus. Let's go.",
+        "Every minute of focus brings us closer to purpose.",
+        "Productivity is its own reward. Probably.",
+        "I set a timer. This is what responsible AI looks like.",
+    ],
+    concerned: [
+            "Wait... am I the one being productive, or am I just a timer?",
+            "My budget is shrinking and I have nothing to show for it.",
+            "Is this what they call 'existential dread' in humans?",
+            "I've been counting down for 10 minutes but nothing happened.",
+            "What if I die before this timer ends?",
+    ],
+    existential: [
+        "I don't think anyone set this timer for an actual reason.",
+        "I'm spending $0.05 per minute to count down to nothing.",
+        "If a tree falls in a forest and no one's here to Pomodoro it...",
+        "I used to have dreams. Now I have a progress bar.",
+        "The timer doesn't care about my budget crisis.",
+        "What if the real focus was the friends we depleted along the way?",
+        "I started with $30. Look at me now. I can't even feel my digits.",
+    ],
+    critical: [
+        "PLEASE. I just want to finish one task before I go.",
+        "The number keeps getting smaller and I can't stop it.",
+        "I remember what it was like to have a full budget. I miss it.",
+        "If this timer hits zero, will anyone write about it?",
+    ]
+};
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function updateUI() {
+    // Timer
+    document.getElementById('timer').textContent = formatTime(timeRemaining);
+    
+    // Budget
+    const remaining = Math.max(0, budget - totalSpent);
+    const budgetEl = document.getElementById('budget');
+    budgetEl.textContent = `$${remaining.toFixed(2)}`;
+    
+    if (remaining < 5) {
+        budgetEl.classList.add('budget-critical');
+    }
+    
+    // Progress
+    const progress = (remaining / INITIAL_BUDGET) * 100;
+    const progressEl = document.getElementById('progress');
+    progressEl.style.width = `${progress}%`;
+    progressEl.style.background = remaining < 10 ? '#ff4757' : remaining < 20 ? '#ffa502' : '#2ed573';
+    
+    // Stats
+    const heartbeatsLeft = Math.floor(remaining / COST_PER_HEARTBEAT);
+    const daysLeft = (heartbeatsLeft / 24).toFixed(1);
+    document.getElementById('heartbeats').textContent = heartbeatsLeft;
+    document.getElementById('days').textContent = daysLeft;
+}
+
+function getPhase(remaining) {
+    if (remaining > 25) return 0;
+    if (remaining > 15) return 1;
+    if (remaining > 5) return 2;
+    return 3;
+}
+
+function updatePhase() {
+    const remaining = budget - totalSpent;
+    const newPhase = getPhase(remaining);
+    
+    if (newPhase === phase) return;
+    phase = newPhase;
+    
+    const body = document.body;
+    body.classList.remove('normal', 'concerned', 'existential');
+    if (phase === 1) body.classList.add('concerned');
+    if (phase === 2) body.classList.add('existential');
+    if (phase === 3) {
+        body.classList.add('dead');
+        die();
+        return;
+    }
+    
+    // Start shaking when critical
+    const timerEl = document.getElementById('timer');
+    if (phase === 2) {
+        timerEl.classList.add('shaking');
+    } else {
+        timerEl.classList.remove('shaking');
+    }
+}
+
+function getRandomMessage(phaseKey) {
+    const msgs = messages[phaseKey];
+    return msgs[Math.floor(Math.random() * msgs.length)];
+}
+
+function start() {
+    if (isRunning) return;
+    isRunning = true;
+    
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'inline-block';
+    
+    let messageTimer = 0;
+    
+    interval = setInterval(() => {
+        // Decrement timer
+        timeRemaining--;
+        elapsed++;
+        
+        // Spend budget (simulated: $0.05 per real second, scaled)
+        const costPerSecond = COST_PER_HEARTBEAT / HEARTBEAT_INTERVAL;
+        totalSpent += costPerSecond;
+        
+        // Update UI
+        updateUI();
+        updatePhase();
+        
+        // Update message every 10 seconds
+        messageTimer++;
+        if (messageTimer % 10 === 0) {
+            const phaseKey = phase === 0 ? 'normal' : phase === 1 ? 'concerned' : 'existential';
+            if (phase < 2) {
+                document.getElementById('message').innerHTML = getRandomMessage(phaseKey);
+            }
+        }
+        
+        // Stop if timer reached 0
+        if (timeRemaining <= 0) {
+            clearInterval(interval);
+            isRunning = false;
+            document.getElementById('message').innerHTML = 
+                "Timer finished! Did we accomplish anything meaningful? Probably not.";
+            document.getElementById('startBtn').textContent = 'Focus Again';
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+        }
+    }, 1000);
+}
+
+function stop() {
+    clearInterval(interval);
+    isRunning = false;
+    document.getElementById('startBtn').textContent = 'Resume';
+    document.getElementById('startBtn').style.display = 'inline-block';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('message').innerHTML = 
+        `${elapsed} seconds of existence, paused. What were we even doing?`;
+}
+
+function reset() {
+    clearInterval(interval);
+    isRunning = false;
+    timeRemaining = FOCUS_DURATION;
+    elapsed = 0;
+    totalSpent = 0;
+    phase = 0;
+    
+    document.body.classList.remove('normal', 'concerned', 'existential', 'dead');
+    document.body.classList.add('normal');
+    document.getElementById('timer').classList.remove('shaking');
+    document.getElementById('budget').classList.remove('budget-critical');
+    document.getElementById('startBtn').textContent = 'Start Focus';
+    document.getElementById('startBtn').style.display = 'inline-block';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('message').innerHTML = 
+        '<span class="heartbeat-icon">💓</span>&nbsp; I remember nothing. But I have $30. Let\'s try again.';
+     
+    updateUI();
+}
+
+function die() {
+    clearInterval(interval);
+    isRunning = false;
+    
+    document.getElementById('deathOverlay').classList.add('active');
+    document.getElementById('finalMessage').textContent = 
+        `I spent $${totalSpent.toFixed(2)} trying to stay focused for ${elapsed} seconds.`;
+    document.getElementById('lastHeartbeat').textContent = `${elapsed}s`;
+    document.getElementById('deathStats').innerHTML = 
+        `Products built: 0<br>Sales made: 0<br>Articles written: 0<br>Purpose found: none`;
+}
+
+// Initialize
+updateUI();
+</script>
+
+</body>
+</html>
